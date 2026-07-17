@@ -38,6 +38,10 @@ down: ## Stop the stack and remove volumes
 dev: ## Run the app in Quarkus dev mode (Dev Services provide postgres + redis)
 	./gradlew quarkusDev
 
+.PHONY: demo
+demo: ## Walk through the authorisation engine against a running app on :8080
+	./demo.sh
+
 .PHONY: test
 test: ## Run the test suite
 	./gradlew test
