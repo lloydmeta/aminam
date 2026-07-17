@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_USER=aminam
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-aminam-dev}
+      - POSTGRES_DB=aminam
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  aminam:
+    build:
+      context: .
+      dockerfile: src/main/docker/Dockerfile.jvm
+    image: aminam-jvm
+    ports:
+      - "8080:8080"
+    environment:
+      - QUARKUS_PROFILE=prod
+      - POSTGRES_USER=aminam
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-aminam-dev}
+      - POSTGRES_DB=aminam
+      - QUARKUS_REDIS_HOSTS=redis://redis:6379
+      - AMINAM_JWT_PRIVATE_KEY_LOCATION=/keys/jwt-private.pem
+      - AMINAM_JWT_PUBLIC_KEY_LOCATION=/keys/jwt-public.pem
+    volumes:
+      - ./keys:/keys:ro
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
