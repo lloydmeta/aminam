@@ -3,7 +3,7 @@ import net.ltgt.gradle.errorprone.errorprone
 plugins {
     java
     id("io.quarkus") version "3.36.2" // Inlined for Dependabot version management
-    id("com.diffplug.spotless") version "8.6.0"
+    id("com.diffplug.spotless") version "8.8.0"
     id("net.ltgt.errorprone") version "5.1.0"
 }
 
