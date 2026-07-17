@@ -1,4 +1,6 @@
-# Aminam
+# aminam
+
+[![CI](https://github.com/lloydmeta/aminam/actions/workflows/ci.yaml/badge.svg)](https://github.com/lloydmeta/aminam/actions/workflows/ci.yaml)
 
 An identity and access management service built on Quarkus (Java 25): user signup, JWT
 authentication, and an attribute-based, fine-grained authorisation engine over organisations and
@@ -26,7 +28,7 @@ the API never leaks the existence of a resource the caller may not see.
   authorisation decision; reads carry an `editable` flag so a caller can be shown a resource
   read-only.
 * Policies: built-in system roles that mimic traditional RBAC roles, plus custom, org-scoped+owned
-  policies with optional CEL condition expressions.
+  policies with optional CEL condition expressions, which allow flexible fine-grained control.
 * Fails closed and does not over-share: an unauthorised caller gets a 403, and a resource they
   cannot see returns a 404 rather than confirming it exists.
 
@@ -34,17 +36,12 @@ the API never leaks the existence of a resource the caller may not see.
 
 Highlights:
 
-* **Authentication kept small and strict:** RS256 JWTs with a short lifetime, asymmetric signing
-  and verification, and the algorithm and claims (issuer, audience) pinned. The same token is
-  accepted as a bearer header or a cookie.
-* **ABAC authorisation** inspired by [AWS IAM policy evaluation](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_evaluation-logic-cross-account.html):
+* ABAC authorisation inspired by [AWS IAM policy evaluation](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_evaluation-logic-cross-account.html):
   every policy is evaluated, an explicit DENY beats any ALLOW, and nothing matching means DENY.
-* **Permissions are managed by policy id.** A manager attaches either a system role or a custom
+* Permissions are managed by policy id: A manager attaches either a system role or a custom
   policy their organisation defined (for example, allow update to one database, or read of every
   database except one). The engine stops non-managers from managing permissions and rejects
   cross-org policy references.
-* **Postgres is the system of record** (schema owned by Flyway); **Redis** backs token revocation
-  so a logout takes effect immediately.
 * Strongly typed identifiers, domain models, and errors, with a clean domain / infra / app
   layering so each layer is testable in isolation.
 
@@ -53,9 +50,9 @@ Highlights:
 The decision splits cleanly into a gather phase that does all the I/O and a pure evaluation phase
 that does none:
 
-* **Gather** loads the facts (attributes of the acting principal and of the target resource) and
+* Gather: loads the facts (attributes of the acting principal and of the target resource) and
   the policies that apply to each, then hands over an immutable evaluation context.
-* **Evaluate** picks a regime from whether the principal's active organisation owns the resource:
+* Evaluate: picks a regime from whether the principal's active organisation owns the resource:
   internal access permits when either the principal's policies or the resource's policies allow;
   cross-org access requires both sides to allow. An explicit DENY anywhere wins, and no match
   fails closed.
