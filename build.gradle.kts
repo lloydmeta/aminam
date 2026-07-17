@@ -54,7 +54,7 @@ dependencies {
     testImplementation("io.quarkus:quarkus-junit")
     testImplementation("io.quarkus:quarkus-junit-mockito")
     testImplementation("io.rest-assured:rest-assured")
-    testImplementation("org.assertj:assertj-core:3.27.3")
+    testImplementation("org.assertj:assertj-core:3.27.7")
 
     errorprone("com.google.errorprone:error_prone_core:$errorProneVersion")
     errorprone("com.uber.nullaway:nullaway:$nullAwayVersion")
