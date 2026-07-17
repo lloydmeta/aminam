@@ -2,9 +2,12 @@
 
 [![CI](https://github.com/lloydmeta/aminam/actions/workflows/ci.yaml/badge.svg)](https://github.com/lloydmeta/aminam/actions/workflows/ci.yaml)
 
-An identity and access management service built on Quarkus (Java 25): user signup, JWT
-authentication, and an attribute-based, fine-grained authorisation engine over organisations and
-the databases they own.
+Authentication Management & Access Management : aminam.
+
+An IAM exploration that has user signup, JWT authentication, and an attribute-based,
+fine-grained authorisation engine over organisations and the databases they own.
+
+**NOT** production ready: this is a personal scratchpad project.
 
 ## Goal
 
