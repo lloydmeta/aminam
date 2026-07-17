@@ -29,7 +29,7 @@ configurations.all {
         // dev.cel 0.13.1's protobuf gencode targets protobuf-java 4.33.5; the Quarkus BOM forces the
         // older 4.33.2, which trips protobuf's gencode/runtime version check. The newer runtime is
         // backwards compatible with the BOM's gencode, so force it.
-        force("com.google.protobuf:protobuf-java:4.33.5")
+        force("com.google.protobuf:protobuf-java:4.35.1")
     }
 }
 
