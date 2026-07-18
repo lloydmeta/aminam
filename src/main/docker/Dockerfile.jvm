@@ -1,0 +1,36 @@
+####
+# Builds a container running the Quarkus application in JVM mode.
+#
+# Before building the container image run:
+#
+#   ./gradlew build
+#
+# Then build the image with:
+#
+#   docker build -f src/main/docker/Dockerfile.jvm -t aminam-jvm .
+#
+# Then run the container using:
+#
+#   docker run -i --rm -p 8080:8080 aminam-jvm
+#
+# Environment variables (passed via -e or docker-compose):
+# - JAVA_OPTS_APPEND: extra JVM flags appended to computed options
+# - JAVA_DEBUG=true / JAVA_DEBUG_PORT=*:5005: enable remote debug (also EXPOSE 5005)
+# - JAVA_MAX_MEM_RATIO: fraction of container memory to use as max heap (default 50)
+###
+FROM registry.access.redhat.com/ubi9/openjdk-25
+
+ENV LANGUAGE='en_US:en'
+
+# Four distinct layers so library layers can be reused across app-only changes
+COPY --chown=185 build/quarkus-app/lib/ /deployments/lib/
+COPY --chown=185 build/quarkus-app/*.jar /deployments/
+COPY --chown=185 build/quarkus-app/app/ /deployments/app/
+COPY --chown=185 build/quarkus-app/quarkus/ /deployments/quarkus/
+
+EXPOSE 8080
+USER 185
+ENV JAVA_OPTS_APPEND="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
+ENV JAVA_APP_JAR="/deployments/quarkus-run.jar"
+
+ENTRYPOINT [ "/opt/jboss/container/java/run/run-java.sh" ]

@@ -1,0 +1,21 @@
+.gradle/
+build/
+bin/
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Quarkus
+.quarkus/
+
+# OS
+.DS_Store
+
+# JWT keys (never commit private keys)
+keys/*
+
+# Live bearer tokens written by demo.sh
+.demo-env
