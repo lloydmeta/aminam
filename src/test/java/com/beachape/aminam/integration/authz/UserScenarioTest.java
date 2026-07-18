@@ -263,8 +263,8 @@ final class UserScenarioTest {
         .contentType(ContentType.JSON)
         .body("message", notNullValue());
 
-    // Widening the share to update is not enough on its own: carol is only a viewer in her home org, so her
-    // identity side still denies update. Both gates must open.
+    // Widening the share to update is not enough on its own: carol is only a viewer in her home
+    // org, so her identity side still denies update. Both gates must open.
     var shareReadWrite =
         TestHelpers.createPolicyIn(
             beachape,
