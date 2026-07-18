@@ -19,7 +19,7 @@ The main showcase is the authorisation engine: ABAC at its core, shipping with b
 system roles scoped to an organisation (manager, admin, viewer) while allowing organisations to 
 define their own custom, fine-grained policies on top.
 
-## What it does
+## What it has/does
 
 * Authentication: signup, login, logout, and `/me`. Login issues a short-lived JWT that works
   as a bearer token or as a cookie; logout revokes it.
@@ -34,6 +34,8 @@ define their own custom, fine-grained policies on top.
   policy their organisation defined to org members.
 * Fails closed: an unauthorised caller gets a 403, and a resource they cannot see returns a 404
   rather than confirming it exists.
+* [OpenAPI/Swagger spec](./api/openapi.yaml), Swagger UI at [/q/swagger-ui](http://localhost:8080/q/swagger-ui/) when
+  running Quarkus Dev mode (more below).
 
 ## Design
 

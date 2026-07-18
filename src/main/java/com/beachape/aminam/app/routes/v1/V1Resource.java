@@ -4,6 +4,7 @@ import com.beachape.aminam.app.routes.v1.authc.LoginResource;
 import com.beachape.aminam.app.routes.v1.authc.LogoutResource;
 import com.beachape.aminam.app.routes.v1.authc.MeResource;
 import com.beachape.aminam.app.routes.v1.authc.SignupResource;
+import com.beachape.aminam.app.routes.v1.authz.AuthzResource;
 import com.beachape.aminam.app.routes.v1.databases.DatabaseResource;
 import com.beachape.aminam.app.routes.v1.orgs.OrgResource;
 import com.beachape.aminam.app.routes.v1.orgs.SessionResource;
@@ -22,6 +23,7 @@ public class V1Resource {
   @Inject OrgResource orgResource;
   @Inject SessionResource sessionResource;
   @Inject DatabaseResource databaseResource;
+  @Inject AuthzResource authzResource;
 
   @Path("/signup")
   public SignupResource signup() {
@@ -56,5 +58,10 @@ public class V1Resource {
   @Path("/databases")
   public DatabaseResource databases() {
     return databaseResource;
+  }
+
+  @Path("/authz")
+  public AuthzResource authz() {
+    return authzResource;
   }
 }

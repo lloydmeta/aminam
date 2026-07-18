@@ -93,10 +93,14 @@ public final class TestHelpers {
     return new OrgSession(switched, orgId);
   }
 
-  /// A fresh org whose creator (a manager) is active in it.
   public static OrgSession managedOrg() {
+    return managedOrg("beachape");
+  }
+
+  /// A fresh org of the given name whose creator (a manager) is active in it.
+  public static OrgSession managedOrg(String orgName) {
     var owner = newAccount();
-    var orgId = createOrgAs(owner.token(), "acme");
+    var orgId = createOrgAs(owner.token(), orgName);
     return switchOrgAs(owner.token(), orgId);
   }
 

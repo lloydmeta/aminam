@@ -1,0 +1,1456 @@
+{
+  "openapi" : "3.1.0",
+  "components" : {
+    "schemas" : {
+      "AddMemberRequest" : {
+        "type" : "object",
+        "required" : [ "username", "policyIds" ],
+        "properties" : {
+          "username" : {
+            "type" : "string",
+            "pattern" : "^[A-Za-z0-9._@+-]+$",
+            "minLength" : 3,
+            "maxLength" : 255
+          },
+          "policyIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "pattern" : "^(system:[a-z]+|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$",
+              "maxLength" : 128
+            },
+            "maxItems" : 50,
+            "minItems" : 1
+          }
+        }
+      },
+      "AuthzResourceType" : {
+        "type" : "string",
+        "enum" : [ "ORG", "DATABASE", "MEMBERSHIP", "SELF_MEMBERSHIP", "POLICY" ]
+      },
+      "AuthzVerb" : {
+        "type" : "string",
+        "enum" : [ "CREATE", "READ", "UPDATE", "DELETE", "ATTACH", "DETACH" ]
+      },
+      "CheckItem" : {
+        "oneOf" : [ {
+          "$ref" : "#/components/schemas/ExistingCheck"
+        }, {
+          "$ref" : "#/components/schemas/ToCreateCheck"
+        } ],
+        "discriminator" : {
+          "propertyName" : "kind",
+          "mapping" : {
+            "EXISTING" : "#/components/schemas/ExistingCheck",
+            "TO_CREATE" : "#/components/schemas/ToCreateCheck"
+          }
+        },
+        "type" : "object"
+      },
+      "CheckRequest" : {
+        "type" : "object",
+        "required" : [ "checks" ],
+        "properties" : {
+          "checks" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CheckItem"
+            },
+            "maxItems" : 100,
+            "minItems" : 1
+          }
+        }
+      },
+      "CheckResponse" : {
+        "type" : "object",
+        "properties" : {
+          "allOk" : {
+            "type" : "boolean"
+          },
+          "results" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CheckResult"
+            }
+          }
+        }
+      },
+      "CheckResult" : {
+        "type" : "object",
+        "properties" : {
+          "ok" : {
+            "type" : "boolean"
+          },
+          "reason" : {
+            "type" : "string"
+          }
+        }
+      },
+      "CreateDatabaseRequest" : {
+        "type" : "object",
+        "required" : [ "name" ],
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "pattern" : "\\S",
+            "maxLength" : 255
+          }
+        }
+      },
+      "CreateOrgRequest" : {
+        "type" : "object",
+        "required" : [ "name" ],
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "pattern" : "\\S",
+            "maxLength" : 255
+          }
+        }
+      },
+      "DatabasePoliciesResponse" : {
+        "type" : "object",
+        "properties" : {
+          "values" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
+      "DatabaseResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "orgId" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "createdBy" : {
+            "type" : "string"
+          },
+          "editable" : {
+            "type" : "boolean"
+          },
+          "createdAt" : {
+            "type" : "string"
+          }
+        }
+      },
+      "DatabasesResponse" : {
+        "type" : "object",
+        "properties" : {
+          "values" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/DatabaseResponse"
+            }
+          }
+        }
+      },
+      "EmptyResponse" : {
+        "type" : "object"
+      },
+      "ExistingCheck" : {
+        "type" : "object",
+        "required" : [ "type", "verb", "id" ],
+        "properties" : {
+          "type" : {
+            "$ref" : "#/components/schemas/AuthzResourceType"
+          },
+          "verb" : {
+            "$ref" : "#/components/schemas/AuthzVerb"
+          },
+          "id" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }
+      },
+      "LoginRequest" : {
+        "type" : "object",
+        "required" : [ "username", "password" ],
+        "properties" : {
+          "username" : {
+            "type" : "string",
+            "pattern" : "\\S",
+            "maxLength" : 255
+          },
+          "password" : {
+            "type" : "string",
+            "pattern" : "\\S",
+            "maxLength" : 72
+          }
+        }
+      },
+      "LoginResponse" : {
+        "type" : "object",
+        "properties" : {
+          "token" : {
+            "type" : "string"
+          }
+        }
+      },
+      "MeResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "username" : {
+            "type" : "string"
+          },
+          "org" : {
+            "type" : "string"
+          }
+        }
+      },
+      "MemberResponse" : {
+        "type" : "object",
+        "properties" : {
+          "membershipId" : {
+            "type" : "string"
+          },
+          "userId" : {
+            "type" : "string"
+          },
+          "username" : {
+            "type" : "string"
+          },
+          "policyIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
+      "MembersResponse" : {
+        "type" : "object",
+        "properties" : {
+          "values" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/MemberResponse"
+            }
+          }
+        }
+      },
+      "OrgResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "createdBy" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string"
+          }
+        }
+      },
+      "OrgsResponse" : {
+        "type" : "object",
+        "properties" : {
+          "values" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrgResponse"
+            }
+          }
+        }
+      },
+      "PoliciesResponse" : {
+        "type" : "object",
+        "properties" : {
+          "values" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PolicyResponse"
+            }
+          }
+        }
+      },
+      "PolicyAction" : {
+        "type" : "object",
+        "required" : [ "type", "verb" ],
+        "properties" : {
+          "type" : {
+            "$ref" : "#/components/schemas/PolicyResourceType"
+          },
+          "verb" : {
+            "$ref" : "#/components/schemas/PolicyVerb"
+          }
+        }
+      },
+      "PolicyEffect" : {
+        "type" : "string",
+        "enum" : [ "ALLOW", "DENY" ]
+      },
+      "PolicyIdsRequest" : {
+        "type" : "object",
+        "required" : [ "policyIds" ],
+        "properties" : {
+          "policyIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "pattern" : "^(system:[a-z]+|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$",
+              "maxLength" : 128
+            },
+            "maxItems" : 50
+          }
+        }
+      },
+      "PolicyRequest" : {
+        "type" : "object",
+        "required" : [ "name", "statements" ],
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "pattern" : "\\S",
+            "maxLength" : 255
+          },
+          "statements" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PolicyStatement"
+            },
+            "maxItems" : 64,
+            "minItems" : 1
+          }
+        }
+      },
+      "PolicyResourcePattern" : {
+        "type" : "object",
+        "required" : [ "type" ],
+        "properties" : {
+          "type" : {
+            "$ref" : "#/components/schemas/PolicyResourceType"
+          },
+          "id" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }
+      },
+      "PolicyResourceType" : {
+        "type" : "string",
+        "enum" : [ "ORG", "DATABASE", "MEMBERSHIP", "SELF_MEMBERSHIP", "POLICY" ]
+      },
+      "PolicyResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "orgId" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "statements" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PolicyStatement"
+            }
+          },
+          "createdAt" : {
+            "type" : "string"
+          }
+        }
+      },
+      "PolicyStatement" : {
+        "type" : "object",
+        "required" : [ "effect", "actions", "resources" ],
+        "properties" : {
+          "effect" : {
+            "$ref" : "#/components/schemas/PolicyEffect"
+          },
+          "memberships" : {
+            "type" : "array",
+            "uniqueItems" : true,
+            "items" : {
+              "type" : "string",
+              "format" : "uuid",
+              "pattern" : "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
+            },
+            "maxItems" : 128
+          },
+          "actions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PolicyAction"
+            },
+            "maxItems" : 64,
+            "minItems" : 1
+          },
+          "resources" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PolicyResourcePattern"
+            },
+            "maxItems" : 128,
+            "minItems" : 1
+          },
+          "condition" : {
+            "type" : "string",
+            "description" : "Optional boolean CEL expression over the server-resolved `principal` and `resource` objects; the statement matches only when it is true. Deterministic builtins only (no time functions). Currently populated attributes: principal.id, principal.active_org, principal.membership_id, resource.type, resource.id, resource.org_id, resource.name, resource.created_by (plus any resource attributes a fact source contributes). An attribute that is absent for the request (an org-less session, a create, a non-database resource, or an unknown key) makes the condition false.",
+            "maxLength" : 2048
+          }
+        }
+      },
+      "PolicyVerb" : {
+        "type" : "string",
+        "enum" : [ "CREATE", "READ", "UPDATE", "DELETE", "ATTACH", "DETACH" ]
+      },
+      "SignupRequest" : {
+        "type" : "object",
+        "required" : [ "username", "password" ],
+        "properties" : {
+          "username" : {
+            "type" : "string",
+            "pattern" : "^[A-Za-z0-9._@+-]+$",
+            "minLength" : 3,
+            "maxLength" : 255
+          },
+          "password" : {
+            "type" : "string",
+            "pattern" : "\\S",
+            "minLength" : 8,
+            "maxLength" : 72
+          }
+        }
+      },
+      "SwitchOrgRequest" : {
+        "type" : "object",
+        "required" : [ "org" ],
+        "properties" : {
+          "org" : {
+            "type" : "string",
+            "pattern" : "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+          }
+        }
+      },
+      "ToCreateCheck" : {
+        "type" : "object",
+        "required" : [ "type", "verb", "owningOrgId" ],
+        "properties" : {
+          "type" : {
+            "$ref" : "#/components/schemas/AuthzResourceType"
+          },
+          "verb" : {
+            "$ref" : "#/components/schemas/AuthzVerb"
+          },
+          "owningOrgId" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }
+      },
+      "UUID" : {
+        "type" : "string",
+        "format" : "uuid",
+        "pattern" : "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
+      },
+      "UpdateDatabaseRequest" : {
+        "type" : "object",
+        "required" : [ "name" ],
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "pattern" : "\\S",
+            "maxLength" : 255
+          }
+        }
+      }
+    }
+  },
+  "paths" : {
+    "/api/v1/authz/_check" : {
+      "post" : {
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CheckRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CheckResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "summary" : "Check",
+        "tags" : [ "Authz Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/databases/{id}" : {
+      "put" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateDatabaseRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DatabaseResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "summary" : "Update",
+        "tags" : [ "Database Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      },
+      "get" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DatabaseResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "summary" : "Get",
+        "tags" : [ "Database Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      },
+      "delete" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EmptyResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "summary" : "Delete",
+        "tags" : [ "Database Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/databases/{id}/policies" : {
+      "put" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PolicyIdsRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DatabasePoliciesResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "summary" : "Set Policies",
+        "tags" : [ "Database Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      },
+      "get" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DatabasePoliciesResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "summary" : "Policies",
+        "tags" : [ "Database Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/login" : {
+      "post" : {
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "summary" : "Login",
+        "tags" : [ "Login Resource" ]
+      }
+    },
+    "/api/v1/logout" : {
+      "post" : {
+        "parameters" : [ {
+          "name" : "access_token",
+          "in" : "cookie",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EmptyResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "summary" : "Logout",
+        "tags" : [ "Logout Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/me" : {
+      "get" : {
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "summary" : "Me",
+        "tags" : [ "Me Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/orgs" : {
+      "get" : {
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OrgsResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "summary" : "List",
+        "tags" : [ "Org Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      },
+      "post" : {
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateOrgRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : { },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "summary" : "Create",
+        "tags" : [ "Org Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/orgs/{id}" : {
+      "get" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OrgResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "summary" : "Get",
+        "tags" : [ "Org Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/orgs/{id}/databases" : {
+      "get" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DatabasesResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "summary" : "List",
+        "tags" : [ "Org Databases Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      },
+      "post" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateDatabaseRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : { },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "summary" : "Create",
+        "tags" : [ "Org Databases Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/orgs/{id}/members" : {
+      "get" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MembersResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "summary" : "Members",
+        "tags" : [ "Org Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      },
+      "post" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AddMemberRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : { },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "summary" : "Add Member",
+        "tags" : [ "Org Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/orgs/{id}/members/{username}" : {
+      "delete" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }, {
+          "name" : "username",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "pattern" : "^[A-Za-z0-9._@+-]+$",
+            "maxLength" : 255
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EmptyResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "summary" : "Remove Member",
+        "tags" : [ "Org Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/orgs/{id}/members/{username}/policies" : {
+      "put" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }, {
+          "name" : "username",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "pattern" : "^[A-Za-z0-9._@+-]+$",
+            "maxLength" : 255
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PolicyIdsRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MemberResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "summary" : "Set Policies",
+        "tags" : [ "Org Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/orgs/{id}/membership" : {
+      "delete" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EmptyResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "summary" : "Leave",
+        "tags" : [ "Org Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/orgs/{id}/policies" : {
+      "get" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PoliciesResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "summary" : "List",
+        "tags" : [ "Org Policies Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      },
+      "post" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PolicyRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : { },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "summary" : "Create",
+        "tags" : [ "Org Policies Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/orgs/{id}/policies/{pid}" : {
+      "put" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }, {
+          "name" : "pid",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PolicyRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PolicyResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "summary" : "Update",
+        "tags" : [ "Org Policies Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      },
+      "get" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }, {
+          "name" : "pid",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PolicyResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "summary" : "Get",
+        "tags" : [ "Org Policies Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      },
+      "delete" : {
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }, {
+          "name" : "pid",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EmptyResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "summary" : "Delete",
+        "tags" : [ "Org Policies Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/sessions/switch-org" : {
+      "post" : {
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SwitchOrgRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "summary" : "Switch Org",
+        "tags" : [ "Session Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/signup" : {
+      "post" : {
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SignupRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : { },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "summary" : "Signup",
+        "tags" : [ "Signup Resource" ]
+      }
+    }
+  },
+  "info" : {
+    "title" : "aminam API",
+    "version" : "1.0.0-SNAPSHOT"
+  },
+  "servers" : [ {
+    "url" : "http://localhost:8080",
+    "description" : "Auto generated value"
+  }, {
+    "url" : "http://0.0.0.0:8080",
+    "description" : "Auto generated value"
+  } ]
+}

@@ -28,7 +28,7 @@ final class OrgAccessAuthzTest {
         .then()
         .statusCode(200)
         .body("id", equalTo(org.id().value().toString()))
-        .body("name", equalTo("acme"));
+        .body("name", equalTo("beachape"));
   }
 
   @Test
@@ -42,7 +42,7 @@ final class OrgAccessAuthzTest {
         .then()
         .statusCode(200)
         .body("id", equalTo(org.id().value().toString()))
-        .body("name", equalTo("acme"));
+        .body("name", equalTo("beachape"));
   }
 
   @Test
