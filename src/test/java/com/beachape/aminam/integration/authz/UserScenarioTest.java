@@ -16,12 +16,12 @@ import com.beachape.aminam.integration.utils.TestHelpers;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
-// End-to-end stories: RBAC and org confinement through CEL conditions to logout revocation, and a
-// creator policy confining each member to the databases they made.
+// End-to-end stories
 @QuarkusTest
 final class UserScenarioTest {
 
@@ -219,6 +219,99 @@ final class UserScenarioTest {
 
     // A rename does not transfer authorship, so bob still owns what he renamed.
     TestHelpers.deleteDatabaseAs(bobSession.token(), bobNotes).statusCode(200);
+  }
+
+  @Test
+  void crossOrgAccessRequiresBilateralConsentAndIsMembershipScoped() {
+    var owner = TestHelpers.newAccount();
+    var beachapeId = TestHelpers.createOrgAs(owner.token(), "beachape");
+    var beachape = TestHelpers.switchOrgAs(owner.token(), beachapeId);
+    var metrics = TestHelpers.createDatabaseIn(beachape, "metrics");
+
+    // carol lives in a different org. A viewer there grants her unconditional database:read, the
+    // identity side of the cross-org AND, but no update.
+    var acme = TestHelpers.managedOrg();
+    var carol = TestHelpers.newAccount();
+    TestHelpers.addMemberToOrg(acme, carol.username(), List.of(SystemPolicies.VIEWER));
+    var carolAcme = TestHelpers.switchOrgAs(carol.token(), acme.id());
+    var carolMembership = TestHelpers.getMembershipIdByUsernameAs(acme, carol.username());
+
+    // Cross-org and nothing shared: carol's identity permits read, but the resource side does not,
+    // and cross-org needs both. A denied cross-org read is 404, so beachape's database is
+    // invisible.
+    TestHelpers.readDatabaseAs(carolAcme.token(), metrics)
+        .statusCode(404)
+        .contentType(ContentType.JSON)
+        .body("message", notNullValue());
+
+    // beachape shares read with carol's acme membership by id. Both sides now permit read: 200,
+    // but only read was shared, so update stays cross-org-denied and the row is not editable.
+    var shareRead =
+        TestHelpers.createPolicyIn(
+            beachape,
+            "share-read",
+            List.of(
+                resourceShare(List.of(PolicyVerb.READ), metrics.value(), carolMembership.value())));
+    TestHelpers.setDatabasePoliciesAs(beachape.token(), metrics, List.of(shareRead))
+        .statusCode(200);
+
+    TestHelpers.readDatabaseAs(carolAcme.token(), metrics)
+        .statusCode(200)
+        .body("editable", equalTo(false));
+    TestHelpers.editDatabaseAs(carolAcme.token(), metrics, "metrics-edited")
+        .statusCode(403)
+        .contentType(ContentType.JSON)
+        .body("message", notNullValue());
+
+    // Widening the share to update is not enough on its own: carol is only a viewer in her home org, so her
+    // identity side still denies update. Both gates must open.
+    var shareReadWrite =
+        TestHelpers.createPolicyIn(
+            beachape,
+            "share-read-write",
+            List.of(
+                resourceShare(
+                    List.of(PolicyVerb.READ, PolicyVerb.UPDATE),
+                    metrics.value(),
+                    carolMembership.value())));
+    TestHelpers.setDatabasePoliciesAs(beachape.token(), metrics, List.of(shareReadWrite))
+        .statusCode(200);
+    TestHelpers.editDatabaseAs(carolAcme.token(), metrics, "metrics-edited")
+        .statusCode(403)
+        .contentType(ContentType.JSON)
+        .body("message", notNullValue());
+
+    // acme grants carol update on her side. Now the resource share and her identity both permit it:
+    // the edit lands and the row reports editable.
+    TestHelpers.setMemberPoliciesAs(acme, carol.username(), List.of(SystemPolicies.ADMIN));
+    TestHelpers.readDatabaseAs(carolAcme.token(), metrics)
+        .statusCode(200)
+        .body("editable", equalTo(true));
+    TestHelpers.editDatabaseAs(carolAcme.token(), metrics, "metrics-edited").statusCode(200);
+
+    // Trust is scoped to the named membership, not the human. The same carol active in her personal
+    // org is a different membership, so beachape's database is invisible again: 404.
+    TestHelpers.readDatabaseAs(carol.token(), metrics)
+        .statusCode(404)
+        .contentType(ContentType.JSON)
+        .body("message", notNullValue());
+
+    // Revocation from the resource side: detaching the share drops the resource permit, so the
+    // cross-org AND fails and the read is 404 once more.
+    TestHelpers.setDatabasePoliciesAs(beachape.token(), metrics, List.of()).statusCode(200);
+    TestHelpers.readDatabaseAs(carolAcme.token(), metrics)
+        .statusCode(404)
+        .contentType(ContentType.JSON)
+        .body("message", notNullValue());
+  }
+
+  private static PolicyStatement resourceShare(List<PolicyVerb> verbs, UUID dbId, UUID membership) {
+    return new PolicyStatement(
+        PolicyEffect.ALLOW,
+        Set.of(membership),
+        verbs.stream().map(verb -> new PolicyAction(PolicyResourceType.DATABASE, verb)).toList(),
+        List.of(new PolicyResourcePattern(PolicyResourceType.DATABASE, dbId)),
+        null);
   }
 
   private static PolicyStatement orgRead() {

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # A guided walkthrough of the aminam authorisation engine, against a running
-# instance on :8080.  Ported from the two end-to-end stories in
+# instance on :8080.  Ported from the three end-to-end stories in
 # src/test/java/com/beachape/aminam/integration/authz/UserScenarioTest.java
 #
 #   make dev        # in one shell
@@ -14,7 +14,7 @@ ENV_FILE="${ENV_FILE:-./.demo-env}"
 PASSWORD="passw0rd"
 BEAT="${BEAT:-0.4}"
 
-readonly TOTAL_ACTS=10
+readonly TOTAL_ACTS=13
 
 if [ -t 1 ]; then
   C_HEAD=$'\033[36m'
@@ -153,6 +153,15 @@ LLOYD_USER="lloyd-$suffix"
 BOB_USER="bob-$suffix"
 LLOYD2_USER="lloyd2-$suffix"
 BOB2_USER="bob2-$suffix"
+CAROL_USER="carol-$suffix"
+
+# Persist the usernames too, so the reproduce blocks can attach and switch by
+# variable rather than baking a literal into the printed command.
+remember LLOYD_USER "$LLOYD_USER"
+remember BOB_USER "$BOB_USER"
+remember LLOYD2_USER "$LLOYD2_USER"
+remember BOB2_USER "$BOB2_USER"
+remember CAROL_USER "$CAROL_USER"
 
 printf '\n  %saminam - a walk through the authorisation engine%s\n\n' "$C_BOLD" "$C_OFF"
 printf '  %-12s%s\n' 'Target' "$BASE"
@@ -160,8 +169,13 @@ printf '  %-12s%s\n' 'Checks' 'curl ok, jq ok, service answering on :8080'
 printf '  %-12s%s\n' 'Env file' "$ENV_FILE  (written as the demo goes; source it at any pause)"
 printf '\n'
 narrate \
-  "Ten acts, ported from UserScenarioTest.java.  Two people: lloyd, who owns" \
-  "an org, and bob, who keeps running into its edges."
+  "Thirteen acts, ported from UserScenarioTest.java.  lloyd owns an org and bob" \
+  "keeps running into its edges; later carol arrives from a second org, and the" \
+  "engine has to decide what crosses the boundary between them." \
+  "" \
+  "Each act ends with a Reproduce block: the actual commands that built it, in" \
+  "terms of the ids and tokens written to $ENV_FILE.  source it in another shell" \
+  "and paste."
 pause
 
 # ---------------------------------------------------------------------------
@@ -190,8 +204,11 @@ show 200 "GET  /api/v1/me                as bob" '"username=" + .username + "  o
 narrate "" "bob's active org is his own.  He has never heard of beachape."
 
 reproduce \
-  "curl -s -H \"Authorization: Bearer \$BOB_LOGIN_TOKEN\" \\" \
-  "  \"\$BASE/api/v1/me\" | jq"
+  "# log in as bob (signup already provisioned his personal org)" \
+  "curl -s -X POST -H 'Content-Type: application/json' \\" \
+  "  -d \"\$(jq -nc --arg u \"\$BOB_USER\" '{username:\$u,password:\"passw0rd\"}')\" \\" \
+  "  \"\$BASE/api/v1/login\" | jq -r .token   # this is \$BOB_LOGIN_TOKEN" \
+  "curl -s -H \"Authorization: Bearer \$BOB_LOGIN_TOKEN\" \"\$BASE/api/v1/me\" | jq"
 pause
 
 # ---------------------------------------------------------------------------
@@ -224,8 +241,11 @@ narrate \
   "every fact the engine evaluates is resolved server-side from them."
 
 reproduce \
-  "echo \"\$LLOYD_TOKEN\" | jq -R 'split(\".\")[1] | gsub(\"-\";\"+\") | gsub(\"_\";\"/\") | @base64d | fromjson'" \
-  "curl -s -H \"Authorization: Bearer \$LLOYD_TOKEN\" \"\$BASE/api/v1/me\" | jq"
+  "# switch into beachape (\$BEACHAPE); switch-org mints a fresh JWT carrying the org claim" \
+  "TOK=\$(curl -s -X POST -H \"Authorization: Bearer \$LLOYD_LOGIN_TOKEN\" -H 'Content-Type: application/json' \\" \
+  "  -d \"\$(jq -nc --arg o \"\$BEACHAPE\" '{org:\$o}')\" \"\$BASE/api/v1/sessions/switch-org\" | jq -r .token)" \
+  "# the claims the engine reads (org, mid, jti) are signed into that token:" \
+  "echo \"\$TOK\" | jq -R 'split(\".\")[1] | gsub(\"-\";\"+\") | gsub(\"_\";\"/\") | @base64d | fromjson'"
 pause
 
 # ---------------------------------------------------------------------------
@@ -261,11 +281,15 @@ call GET "/api/v1/orgs/$BEACHAPE/databases" "$BOB_TOKEN"
 show 200 "GET  /api/v1/orgs/\$BEACHAPE/databases as bob (beachape)" '"values=" + (.values | map(.name) | tostring)'
 
 reproduce \
-  "# the same URL, the two tokens" \
+  "# lloyd adds bob to beachape as a viewer" \
+  "curl -s -X POST -H \"Authorization: Bearer \$LLOYD_TOKEN\" -H 'Content-Type: application/json' \\" \
+  "  -d \"\$(jq -nc --arg u \"\$BOB_USER\" '{username:\$u,policyIds:[\"system:viewer\"]}')\" \\" \
+  "  \"\$BASE/api/v1/orgs/\$BEACHAPE/members\"" \
+  "# membership alone is not enough: the same URL, the two tokens" \
   "curl -s -o /dev/null -w '%{http_code}\\n' -H \"Authorization: Bearer \$BOB_LOGIN_TOKEN\" \\" \
-  "  \"\$BASE/api/v1/orgs/\$BEACHAPE/databases\"   # 404" \
+  "  \"\$BASE/api/v1/orgs/\$BEACHAPE/databases\"   # 404, still anchored to his personal org" \
   "curl -s -o /dev/null -w '%{http_code}\\n' -H \"Authorization: Bearer \$BOB_TOKEN\" \\" \
-  "  \"\$BASE/api/v1/orgs/\$BEACHAPE/databases\"   # 200"
+  "  \"\$BASE/api/v1/orgs/\$BEACHAPE/databases\"   # 200, switched into beachape"
 pause
 
 # ---------------------------------------------------------------------------
@@ -301,8 +325,12 @@ narrate \
   "nothing he did not already know."
 
 reproduce \
-  "curl -s -H \"Authorization: Bearer \$BOB_TOKEN\" \\" \
-  "  \"\$BASE/api/v1/databases/\$ALPHA\" | jq '{name, editable}'"
+  "# lloyd creates a database; bob (viewer) may read it but not write it" \
+  "curl -s -X POST -H \"Authorization: Bearer \$LLOYD_TOKEN\" -H 'Content-Type: application/json' \\" \
+  "  -d '{\"name\":\"alpha\"}' \"\$BASE/api/v1/orgs/\$BEACHAPE/databases\"   # returns \$ALPHA" \
+  "curl -s -H \"Authorization: Bearer \$BOB_TOKEN\" \"\$BASE/api/v1/databases/\$ALPHA\" | jq '{name, editable}'" \
+  "curl -s -o /dev/null -w '%{http_code}\\n' -X DELETE -H \"Authorization: Bearer \$BOB_TOKEN\" \\" \
+  "  \"\$BASE/api/v1/databases/\$ALPHA\"   # 403: visible, so a denied delete is 403 not 404"
 pause
 
 # ---------------------------------------------------------------------------
@@ -328,9 +356,10 @@ narrate \
   "not to ask."
 
 reproduce \
+  "# bob holds the token and is the username in the path, so he asks for system:manager" \
   "curl -s -X PUT -H \"Authorization: Bearer \$BOB_TOKEN\" \\" \
   "  -H 'Content-Type: application/json' -d '{\"policyIds\":[\"system:manager\"]}' \\" \
-  "  \"\$BASE/api/v1/orgs/\$BEACHAPE/members/$BOB_USER/policies\" | jq"
+  "  \"\$BASE/api/v1/orgs/\$BEACHAPE/members/\$BOB_USER/policies\" | jq   # 403"
 pause
 
 # ---------------------------------------------------------------------------
@@ -367,6 +396,7 @@ deny_override_policy="$(jq -nc --arg gamma "$GAMMA" '{
   ]
 }')"
 
+remember DENY_OVERRIDE_BODY "$deny_override_policy"
 call POST "/api/v1/orgs/$BEACHAPE/policies" "$LLOYD_BEACHAPE" "$deny_override_policy"
 show 201 "POST /api/v1/orgs/\$BEACHAPE/policies  as lloyd" '"name=" + .name'
 DENY_OVERRIDE="$(jqr .id)"
@@ -409,10 +439,16 @@ call DELETE "/api/v1/databases/$GAMMA" "$BOB_TOKEN"
 show 403 "DELETE /api/v1/databases/\$GAMMA       as bob" '"message=\"" + .message + "\""'
 
 reproduce \
+  "# the policy body is in \$DENY_OVERRIDE_BODY  (echo \"\$DENY_OVERRIDE_BODY\" | jq  to read it)" \
+  "DO=\$(curl -s -X POST -H \"Authorization: Bearer \$LLOYD_TOKEN\" -H 'Content-Type: application/json' \\" \
+  "  -d \"\$DENY_OVERRIDE_BODY\" \"\$BASE/api/v1/orgs/\$BEACHAPE/policies\" | jq -r .id)" \
+  "# attach it to bob alongside system:viewer" \
+  "curl -s -X PUT -H \"Authorization: Bearer \$LLOYD_TOKEN\" -H 'Content-Type: application/json' \\" \
+  "  -d \"\$(jq -nc --arg p \"\$DO\" '{policyIds:[\"system:viewer\",\$p]}')\" \\" \
+  "  \"\$BASE/api/v1/orgs/\$BEACHAPE/members/\$BOB_USER/policies\"" \
+  "# bob's editable flags: alpha and beta true, gamma denied by the specific DENY" \
   "curl -s -H \"Authorization: Bearer \$BOB_TOKEN\" \\" \
-  "  \"\$BASE/api/v1/orgs/\$BEACHAPE/databases\" | jq '.values[] | {name, editable}'" \
-  "curl -s \"\$BASE/api/v1/orgs/\$BEACHAPE/policies/\$DENY_OVERRIDE\" \\" \
-  "  -H \"Authorization: Bearer \$LLOYD_TOKEN\" | jq '.statements'"
+  "  \"\$BASE/api/v1/orgs/\$BEACHAPE/databases\" | jq '.values[] | {name, editable}'"
 pause
 
 # ---------------------------------------------------------------------------
@@ -462,6 +498,7 @@ report_editors_policy="$(jq -nc \
   ]
 }')"
 
+remember REPORT_EDITORS_BODY "$report_editors_policy"
 call POST "/api/v1/orgs/$BEACHAPE/policies" "$LLOYD_BEACHAPE" "$report_editors_policy"
 show 201 "POST /api/v1/orgs/\$BEACHAPE/policies  as lloyd" '"name=" + .name'
 REPORT_EDITORS="$(jqr .id)"
@@ -495,6 +532,14 @@ narrate \
   "grants nothing instead of granting everything."
 
 reproduce \
+  "# the report-editors policy - the CEL condition and the DENY - is in \$REPORT_EDITORS_BODY:" \
+  "echo \"\$REPORT_EDITORS_BODY\" | jq '.statements'" \
+  "RE=\$(curl -s -X POST -H \"Authorization: Bearer \$LLOYD_TOKEN\" -H 'Content-Type: application/json' \\" \
+  "  -d \"\$REPORT_EDITORS_BODY\" \"\$BASE/api/v1/orgs/\$BEACHAPE/policies\" | jq -r .id)" \
+  "curl -s -X PUT -H \"Authorization: Bearer \$LLOYD_TOKEN\" -H 'Content-Type: application/json' \\" \
+  "  -d \"\$(jq -nc --arg p \"\$RE\" '{policyIds:[\"system:viewer\",\$p]}')\" \\" \
+  "  \"\$BASE/api/v1/orgs/\$BEACHAPE/members/\$BOB_USER/policies\"" \
+  "# editable follows the condition: report-open true, report-locked DENY, ledger no match" \
   "curl -s -H \"Authorization: Bearer \$BOB_TOKEN\" \\" \
   "  \"\$BASE/api/v1/orgs/\$BEACHAPE/databases\" | jq '.values[] | {name, editable}'"
 pause
@@ -529,6 +574,8 @@ narrate \
   "stateless tokens, paid deliberately."
 
 reproduce \
+  "# act 8 already POSTed /logout with \$BOB_TOKEN, writing its jti to a Redis blocklist" \
+  "# the token is unchanged - same jti, same exp - but now rejected:" \
   "echo \"\$BOB_TOKEN\" | jq -R 'split(\".\")[1] | gsub(\"-\";\"+\") | gsub(\"_\";\"/\") | @base64d | fromjson | {jti, exp}'" \
   "curl -s -o /dev/null -w '%{http_code}\\n' -H \"Authorization: Bearer \$BOB_TOKEN\" \\" \
   "  \"\$BASE/api/v1/me\"   # 401, and it will stay 401"
@@ -561,31 +608,23 @@ narrate \
   "facts yet, so an ownership condition could never hold on it.  Ownership" \
   "gates what happens afterwards."
 
-own_databases_policy='{
-  "name": "own-databases",
-  "statements": [
+# Built with jq -nc for parity with the other policy bodies, so it persists as a
+# single line and echo "$OWN_DATABASES_BODY" | jq reads back cleanly.  The
+# condition carries no single quotes, so it needs no --arg.
+own_databases_policy="$(jq -nc '{
+  name: "own-databases",
+  statements: [
+    { effect: "ALLOW", actions: [{type:"ORG",verb:"READ"}], resources: [{type:"ORG",id:null}] },
+    { effect: "ALLOW", actions: [{type:"DATABASE",verb:"CREATE"}], resources: [{type:"DATABASE",id:null}] },
     {
-      "effect": "ALLOW",
-      "actions": [{"type":"ORG","verb":"READ"}],
-      "resources": [{"type":"ORG","id":null}]
-    },
-    {
-      "effect": "ALLOW",
-      "actions": [{"type":"DATABASE","verb":"CREATE"}],
-      "resources": [{"type":"DATABASE","id":null}]
-    },
-    {
-      "effect": "ALLOW",
-      "actions": [
-        {"type":"DATABASE","verb":"READ"},
-        {"type":"DATABASE","verb":"UPDATE"},
-        {"type":"DATABASE","verb":"DELETE"}
-      ],
-      "resources": [{"type":"DATABASE","id":null}],
-      "condition": "resource.created_by == principal.id"
+      effect: "ALLOW",
+      actions: [{type:"DATABASE",verb:"READ"},{type:"DATABASE",verb:"UPDATE"},{type:"DATABASE",verb:"DELETE"}],
+      resources: [{type:"DATABASE",id:null}],
+      condition: "resource.created_by == principal.id"
     }
   ]
-}'
+}')"
+remember OWN_DATABASES_BODY "$own_databases_policy"
 
 call POST "/api/v1/orgs/$ACME/policies" "$LLOYD2_ACME" "$own_databases_policy"
 show 201 "POST /api/v1/orgs/\$ACME/policies      as lloyd" '"name=" + .name'
@@ -625,6 +664,15 @@ call PUT "/api/v1/databases/$BOB_NOTES" "$BOB2_TOKEN" '{"name":"bob-notes-edited
 show 200 "PUT  /api/v1/databases/\$BOB_NOTES     as bob" '"name=" + .name'
 
 reproduce \
+  "# own-databases (org:read, database:create, and CRUD gated by created_by) is in \$OWN_DATABASES_BODY:" \
+  "echo \"\$OWN_DATABASES_BODY\" | jq '.statements'" \
+  "OD=\$(curl -s -X POST -H \"Authorization: Bearer \$LLOYD2_TOKEN\" -H 'Content-Type: application/json' \\" \
+  "  -d \"\$OWN_DATABASES_BODY\" \"\$BASE/api/v1/orgs/\$ACME/policies\" | jq -r .id)" \
+  "# bob holds that policy alone - deliberately no system:viewer" \
+  "curl -s -X POST -H \"Authorization: Bearer \$LLOYD2_TOKEN\" -H 'Content-Type: application/json' \\" \
+  "  -d \"\$(jq -nc --arg u \"\$BOB2_USER\" --arg p \"\$OD\" '{username:\$u,policyIds:[\$p]}')\" \\" \
+  "  \"\$BASE/api/v1/orgs/\$ACME/members\"" \
+  "# his own row: the condition holds, so it is his to read and edit" \
   "curl -s -H \"Authorization: Bearer \$BOB2_TOKEN\" \\" \
   "  \"\$BASE/api/v1/databases/\$BOB_NOTES\" | jq '{name, editable, createdBy}'"
 pause
@@ -672,10 +720,206 @@ call DELETE "/api/v1/databases/$BOB_NOTES" "$BOB2_TOKEN"
 show 200 "DELETE /api/v1/databases/\$BOB_NOTES   as bob" ''
 
 reproduce \
+  "# lloyd's ledger fails bob's created_by condition: unreadable, so a denied delete is 404 not 403" \
   "curl -s -o /dev/null -w '%{http_code}\\n' -X DELETE \\" \
-  "  -H \"Authorization: Bearer \$BOB2_TOKEN\" \"\$BASE/api/v1/databases/\$ACME_LEDGER\"" \
+  "  -H \"Authorization: Bearer \$BOB2_TOKEN\" \"\$BASE/api/v1/databases/\$ACME_LEDGER\"   # 404" \
+  "# the list is filtered, not flagged: rows bob cannot read are simply absent" \
   "curl -s -H \"Authorization: Bearer \$BOB2_TOKEN\" \\" \
   "  \"\$BASE/api/v1/orgs/\$ACME/databases\" | jq '.values[].name'"
+pause
+
+# ---------------------------------------------------------------------------
+# Act 11 - a second org's member, and the wall between them
+# ---------------------------------------------------------------------------
+
+act "a second org's member, and the wall between them"
+
+signup_and_login "$CAROL_USER"; CAROL_LOGIN="$new_token"
+show 200 "POST /api/v1/signup + /login          as carol" '"token=" + (.token[0:16]) + "..."'
+remember CAROL_LOGIN_TOKEN "$CAROL_LOGIN"
+
+narrate \
+  "carol belongs to acme, lloyd2's org from acts 9 and 10 - not to beachape." \
+  "lloyd2 seats her there as a viewer, so acme grants her an unconditional" \
+  "database:read.  That is the identity side of the cross-org decision."
+
+call POST "/api/v1/orgs/$ACME/members" "$LLOYD2_ACME" \
+  "$(jq -nc --arg u "$CAROL_USER" '{username:$u,policyIds:["system:viewer"]}')"
+show 201 "POST /api/v1/orgs/\$ACME/members         as lloyd2" '"username=" + .username'
+
+call POST /api/v1/sessions/switch-org "$CAROL_LOGIN" "$(jq -nc --arg o "$ACME" '{org:$o}')"
+show 200 "POST /api/v1/sessions/switch-org        as carol" '"token=" + (.token[0:16]) + "...(acme)"'
+CAROL_ACME="$(jqr .token)"
+remember CAROL_TOKEN "$CAROL_ACME"
+
+narrate "" "lloyd creates a database in beachape.  carol has never been near it."
+
+call POST "/api/v1/orgs/$BEACHAPE/databases" "$LLOYD_BEACHAPE" '{"name":"metrics"}'
+show 201 "POST /api/v1/orgs/\$BEACHAPE/databases   as lloyd" '"name=" + .name'
+METRICS="$(jqr .id)"
+remember METRICS "$METRICS"
+
+narrate \
+  "" \
+  "carol, active in acme, asks beachape for metrics.  Her acme role permits" \
+  "database:read, but the row lives in another org: the regime is cross-org, and" \
+  "cross-org needs BOTH sides to allow.  beachape has shared nothing, so the" \
+  "resource side denies - and the read is 404, not the 403 that would admit it exists."
+
+call GET "/api/v1/databases/$METRICS" "$CAROL_ACME"
+show 404 "GET  /api/v1/databases/\$METRICS         as carol (acme)" '"message=\"" + .message + "\""'
+
+reproduce \
+  "# carol is a viewer in acme; beachape's metrics is invisible until it is shared" \
+  "curl -s -o /dev/null -w '%{http_code}\\n' -H \"Authorization: Bearer \$CAROL_TOKEN\" \\" \
+  "  \"\$BASE/api/v1/databases/\$METRICS\"   # 404: cross-org, resource side has shared nothing"
+pause
+
+# ---------------------------------------------------------------------------
+# Act 12 - bilateral consent, and two gates for writing
+# ---------------------------------------------------------------------------
+
+act "bilateral consent, and two gates for writing"
+
+narrate \
+  "For beachape to trust carol it needs the id of her acme membership - the seat," \
+  "not the person.  acme discloses it out of band; here lloyd2 reads it from the" \
+  "acme member list."
+
+call GET "/api/v1/orgs/$ACME/members" "$LLOYD2_ACME"
+show 200 "GET  /api/v1/orgs/\$ACME/members         as lloyd2" '"members=" + (.values | length | tostring)'
+CAROL_MID="$(printf '%s' "$body" | jq -r --arg u "$CAROL_USER" '.values[] | select(.username==$u) | .membershipId')"
+remember CAROL_MID "$CAROL_MID"
+printf '  %-58s          %s\n' '' "carol's acme seat=${CAROL_MID:0:8}..."
+
+narrate \
+  "" \
+  "beachape authors a resource policy naming that seat and allowing database:read" \
+  "on metrics, then attaches it to the database.  This is the resource side" \
+  "consenting - and because it names a membership, trust is scoped to that one seat."
+
+share_read_body="$(jq -nc --arg mid "$CAROL_MID" --arg db "$METRICS" '{
+  name: "share-metrics-read",
+  statements: [
+    {
+      effect: "ALLOW",
+      memberships: [$mid],
+      actions: [{type:"DATABASE",verb:"READ"}],
+      resources: [{type:"DATABASE", id:$db}]
+    }
+  ]
+}')"
+remember SHARE_READ_BODY "$share_read_body"
+
+call POST "/api/v1/orgs/$BEACHAPE/policies" "$LLOYD_BEACHAPE" "$share_read_body"
+show 201 "POST /api/v1/orgs/\$BEACHAPE/policies    as lloyd" '"name=" + .name'
+SHARE_READ="$(jqr .id)"
+remember SHARE_READ "$SHARE_READ"
+
+call PUT "/api/v1/databases/$METRICS/policies" "$LLOYD_BEACHAPE" \
+  "$(jq -nc --arg p "$SHARE_READ" '{policyIds:[$p]}')"
+show 200 "PUT  /api/v1/databases/\$METRICS/policies as lloyd" '"shares=" + (.values | length | tostring)'
+
+narrate "" "Both sides now allow read.  carol reads metrics - but only read was shared:" ""
+call GET "/api/v1/databases/$METRICS" "$CAROL_ACME"
+show 200 "GET  /api/v1/databases/\$METRICS         as carol (acme)" '"name=" + .name + "  editable=" + (.editable | tostring)'
+call PUT "/api/v1/databases/$METRICS" "$CAROL_ACME" '{"name":"metrics-edited"}'
+show 403 "PUT  /api/v1/databases/\$METRICS         as carol (acme)" '"message=\"" + .message + "\""'
+
+narrate \
+  "" \
+  "beachape widens the share to update too.  carol still gets 403 - because she is" \
+  "only a viewer in acme, her identity side does not grant update.  A cross-org" \
+  "write needs both gates: the owner shares it AND the caller's own org grants it."
+
+share_rw_body="$(jq -nc --arg mid "$CAROL_MID" --arg db "$METRICS" '{
+  name: "share-metrics-read-write",
+  statements: [
+    {
+      effect: "ALLOW",
+      memberships: [$mid],
+      actions: [{type:"DATABASE",verb:"READ"},{type:"DATABASE",verb:"UPDATE"}],
+      resources: [{type:"DATABASE", id:$db}]
+    }
+  ]
+}')"
+remember SHARE_RW_BODY "$share_rw_body"
+
+call POST "/api/v1/orgs/$BEACHAPE/policies" "$LLOYD_BEACHAPE" "$share_rw_body"
+SHARE_RW="$(jqr .id)"
+remember SHARE_RW "$SHARE_RW"
+call PUT "/api/v1/databases/$METRICS/policies" "$LLOYD_BEACHAPE" \
+  "$(jq -nc --arg p "$SHARE_RW" '{policyIds:[$p]}')"
+show 200 "PUT  /api/v1/databases/\$METRICS/policies as lloyd (widened)" '"shares=" + (.values | length | tostring)'
+
+call PUT "/api/v1/databases/$METRICS" "$CAROL_ACME" '{"name":"metrics-edited"}'
+show 403 "PUT  /api/v1/databases/\$METRICS         as carol (viewer)" '"message=\"" + .message + "\""'
+
+narrate "" "acme upgrades carol to admin.  Now her identity grants update, and the edit lands." ""
+call PUT "/api/v1/orgs/$ACME/members/$CAROL_USER/policies" "$LLOYD2_ACME" '{"policyIds":["system:admin"]}'
+show 200 "PUT  /api/v1/orgs/\$ACME/members/carol/policies as lloyd2" '"policyIds=" + (.policyIds | tostring)'
+
+call GET "/api/v1/databases/$METRICS" "$CAROL_ACME"
+show 200 "GET  /api/v1/databases/\$METRICS         as carol (admin)" '"editable=" + (.editable | tostring)'
+call PUT "/api/v1/databases/$METRICS" "$CAROL_ACME" '{"name":"metrics-edited"}'
+show 200 "PUT  /api/v1/databases/\$METRICS         as carol (admin)" '"name=" + .name'
+
+reproduce \
+  "# resource side: beachape shares read with carol's acme seat (\$CAROL_MID), body in \$SHARE_READ_BODY" \
+  "SR=\$(curl -s -X POST -H \"Authorization: Bearer \$LLOYD_TOKEN\" -H 'Content-Type: application/json' \\" \
+  "  -d \"\$SHARE_READ_BODY\" \"\$BASE/api/v1/orgs/\$BEACHAPE/policies\" | jq -r .id)" \
+  "curl -s -X PUT -H \"Authorization: Bearer \$LLOYD_TOKEN\" -H 'Content-Type: application/json' \\" \
+  "  -d \"\$(jq -nc --arg p \"\$SR\" '{policyIds:[\$p]}')\" \"\$BASE/api/v1/databases/\$METRICS/policies\"" \
+  "curl -s -H \"Authorization: Bearer \$CAROL_TOKEN\" \"\$BASE/api/v1/databases/\$METRICS\" | jq '{name, editable}'  # editable:false" \
+  "# a write needs both gates: widen the share (\$SHARE_RW_BODY) AND make carol an acme admin" \
+  "RW=\$(curl -s -X POST -H \"Authorization: Bearer \$LLOYD_TOKEN\" -H 'Content-Type: application/json' \\" \
+  "  -d \"\$SHARE_RW_BODY\" \"\$BASE/api/v1/orgs/\$BEACHAPE/policies\" | jq -r .id)" \
+  "curl -s -X PUT -H \"Authorization: Bearer \$LLOYD_TOKEN\" -H 'Content-Type: application/json' \\" \
+  "  -d \"\$(jq -nc --arg p \"\$RW\" '{policyIds:[\$p]}')\" \"\$BASE/api/v1/databases/\$METRICS/policies\"" \
+  "curl -s -X PUT -H \"Authorization: Bearer \$LLOYD2_TOKEN\" -H 'Content-Type: application/json' \\" \
+  "  -d '{\"policyIds\":[\"system:admin\"]}' \"\$BASE/api/v1/orgs/\$ACME/members/\$CAROL_USER/policies\"" \
+  "curl -s -X PUT -H \"Authorization: Bearer \$CAROL_TOKEN\" -H 'Content-Type: application/json' \\" \
+  "  -d '{\"name\":\"metrics-edited\"}' \"\$BASE/api/v1/databases/\$METRICS\" | jq '{name}'   # 200 now"
+pause
+
+# ---------------------------------------------------------------------------
+# Act 13 - trust bound to a membership, and revoked at will
+# ---------------------------------------------------------------------------
+
+act "trust bound to a membership, and revoked at will"
+
+narrate \
+  "The share named carol's acme seat, not carol.  The same human active in her" \
+  "own personal org is a different membership, so metrics is invisible from there:"
+
+call GET "/api/v1/databases/$METRICS" "$CAROL_LOGIN"
+show 404 "GET  /api/v1/databases/\$METRICS         as carol (personal org)" '"message=\"" + .message + "\""'
+
+narrate "" "beachape can see exactly what it has shared, and withdraw it:" ""
+call GET "/api/v1/databases/$METRICS/policies" "$LLOYD_BEACHAPE"
+show 200 "GET  /api/v1/databases/\$METRICS/policies as lloyd" '"shares=" + (.values | tostring)'
+
+call PUT "/api/v1/databases/$METRICS/policies" "$LLOYD_BEACHAPE" '{"policyIds":[]}'
+show 200 "PUT  /api/v1/databases/\$METRICS/policies as lloyd (detach)" '"shares=" + (.values | length | tostring)'
+
+narrate \
+  "" \
+  "With the resource side withdrawn the cross-org AND fails again.  carol - still" \
+  "an acme admin, her identity side intact - is back to 404.  Either side alone" \
+  "revokes: consent has to be mutual, and it has to be current."
+
+call GET "/api/v1/databases/$METRICS" "$CAROL_ACME"
+show 404 "GET  /api/v1/databases/\$METRICS         as carol (acme)" '"message=\"" + .message + "\""'
+
+reproduce \
+  "# the share named her acme seat, so from her personal org metrics is invisible" \
+  "curl -s -o /dev/null -w '%{http_code}\\n' -H \"Authorization: Bearer \$CAROL_LOGIN_TOKEN\" \\" \
+  "  \"\$BASE/api/v1/databases/\$METRICS\"   # 404" \
+  "# beachape withdraws every share (the empty set detaches); the AND fails, carol (acme) is 404 again" \
+  "curl -s -X PUT -H \"Authorization: Bearer \$LLOYD_TOKEN\" -H 'Content-Type: application/json' \\" \
+  "  -d '{\"policyIds\":[]}' \"\$BASE/api/v1/databases/\$METRICS/policies\"" \
+  "curl -s -o /dev/null -w '%{http_code}\\n' -H \"Authorization: Bearer \$CAROL_TOKEN\" \\" \
+  "  \"\$BASE/api/v1/databases/\$METRICS\"   # 404"
 pause
 
 # ---------------------------------------------------------------------------
@@ -700,10 +944,10 @@ narrate \
   "  source $ENV_FILE" \
   "" \
   "Past the curtain some of it is spent, by design: act 8 revoked \$BOB_TOKEN," \
-  "and acts 6 and 10 deleted databases.  \$LLOYD_TOKEN, \$LLOYD2_TOKEN and" \
-  "\$BOB2_TOKEN are still live." \
+  "acts 6 and 10 deleted databases, and act 13 withdrew every share on \$METRICS." \
+  "\$LLOYD_TOKEN, \$LLOYD2_TOKEN, \$BOB2_TOKEN and \$CAROL_TOKEN are still live." \
   "" \
-  "The same two stories, in Java:" \
+  "The same three stories, in Java:" \
   "  src/test/java/com/beachape/aminam/integration/authz/UserScenarioTest.java" \
   "" \
   "The engine that decided all of it:" \
