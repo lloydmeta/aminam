@@ -13,13 +13,11 @@ fine-grained authorisation engine over organisations and the databases they own.
 
 Model a world where a user can belong to many organisations at once, each organisation owns some
 resources (here, databases), and what a user may do to a resource depends on the policies that
-apply to them in that organisation. The main showcase is the authorisation engine: ABAC at
-its core, shipping with built-in system roles scoped to an organisation (manager, admin, viewer)
-and allowing organisations to define their own custom, fine-grained policies on top.
+apply to them in that organisation.
 
-Authorisation drives resource visibility directly. A database can be editable, read-only (returned
-but not writable), or unavailable (not returned at all) depending on the caller's permissions, so
-the API never leaks the existence of a resource the caller may not see.
+The main showcase is the authorisation engine: ABAC at its core, shipping with built-in RBAC like
+system roles scoped to an organisation (manager, admin, viewer) while allowing organisations to 
+define their own custom, fine-grained policies on top.
 
 ## What it does
 
@@ -27,13 +25,15 @@ the API never leaks the existence of a resource the caller may not see.
   as a bearer token or as a cookie; logout revokes it.
 * Organisations and membership: create organisations, add and remove members, and switch the
   active organisation for the current session.
-* Databases as the governed resource: create, read, update, and delete, each gated by an
-  authorisation decision; reads carry an `editable` flag so a caller can be shown a resource
-  read-only.
-* Policies: built-in system roles that mimic traditional RBAC roles, plus custom, org-scoped+owned
-  policies with optional CEL condition expressions, which allow flexible fine-grained control.
-* Fails closed and does not over-share: an unauthorised caller gets a 403, and a resource they
-  cannot see returns a 404 rather than confirming it exists.
+* Databases as the main authz-governed resource: create, read, update, and delete; read DTOs
+  carry an `editable` flag so a caller can be shown a resource is read-only.
+* Policies: built-in system roles that mimic traditional RBAC roles, plus user-definable
+  custom, org-scoped+owned policies with optional [CEL](https://celbyexample.com) condition
+  expressions, which allow flexible fine-grained control (e.g. creator-managed databases).
+* Permissions are managed by policy id: A manager attaches either a system role or a custom
+  policy their organisation defined to org members.
+* Fails closed: an unauthorised caller gets a 403, and a resource they cannot see returns a 404
+  rather than confirming it exists.
 
 ## Design
 
@@ -41,23 +41,17 @@ Highlights:
 
 * ABAC authorisation inspired by [AWS IAM policy evaluation](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_evaluation-logic-cross-account.html):
   every policy is evaluated, an explicit DENY beats any ALLOW, and nothing matching means DENY.
-* Permissions are managed by policy id: A manager attaches either a system role or a custom
-  policy their organisation defined (for example, allow update to one database, or read of every
-  database except one). The engine stops non-managers from managing permissions and rejects
-  cross-org policy references.
 * Strongly typed identifiers, domain models, and errors, with a clean domain / infra / app
   layering so each layer is testable in isolation.
 
 ### Authorisation engine
 
-The decision splits cleanly into a gather phase that does all the I/O and a pure evaluation phase
-that does none:
-
+The decision splits cleanly into IO vs evaluation phases:
 * Gather: loads the facts (attributes of the acting principal and of the target resource) and
   the policies that apply to each, then hands over an immutable evaluation context.
 * Evaluate: picks a regime from whether the principal's active organisation owns the resource:
-  internal access permits when either the principal's policies or the resource's policies allow;
-  cross-org access requires both sides to allow. An explicit DENY anywhere wins, and no match
+  "internal" access permits when either the principal's policies or the resource's policies allow;
+  "cross-org" access requires both sides to allow. An explicit DENY anywhere wins, and no match
   fails closed.
 
 ```mermaid
@@ -99,10 +93,12 @@ flowchart TD
 
 A policy covers both the built-in system roles (viewer, admin, manager), which have no database
 row and are evaluated in code, and custom policies, which an organisation owns and which are
-stored. A membership carries policy attachments; each policy is a set of statements, and each
+stored.
+
+A membership carries policy attachments; each policy is a set of statements, and each
 statement has an effect (ALLOW or DENY), a set of actions (a resource type paired with a verb),
 and the resource patterns it targets (a resource type plus an optional id, where a null id is a
-wildcard over that type).
+wildcard over that type).  It may also optionally have a condition.
 
 ```mermaid
 erDiagram
@@ -115,6 +111,7 @@ erDiagram
     POLICY ||--o{ STATEMENT : "made of"
     STATEMENT ||--o{ ACTION : "over"
     STATEMENT ||--o{ RESOURCE_PATTERN : "scoped to"
+    STATEMENT ||--o{ CONDITION : "has"
     STATEMENT {
         Effect effect "ALLOW or DENY"
     }
@@ -125,6 +122,9 @@ erDiagram
     RESOURCE_PATTERN {
         ResourceType type "ORG | DATABASE | MEMBERSHIP | POLICY"
         UUID id "null = wildcard over the type"
+    }
+    CONDITION {
+        String expression "CEL expression over the facts"
     }
 ```
 
