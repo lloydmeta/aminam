@@ -34,7 +34,7 @@ configurations.all {
 }
 
 dependencies {
-    implementation(enforcedPlatform("io.quarkus.platform:quarkus-bom:3.37.3")) // Inlined for Dependabot version management
+    implementation(enforcedPlatform("io.quarkus.platform:quarkus-bom:3.37.4")) // Inlined for Dependabot version management
     implementation("io.quarkus:quarkus-rest")
     implementation("io.quarkus:quarkus-rest-jackson")
     implementation("io.quarkus:quarkus-arc")
