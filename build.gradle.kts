@@ -50,7 +50,7 @@ dependencies {
     implementation("io.smallrye:smallrye-jwt")
     implementation("com.password4j:password4j:1.8.4")
     implementation("dev.cel:cel:0.13.1")
-    implementation("org.jspecify:jspecify:1.0.0")
+    implementation("org.jspecify:jspecify:1.0.1")
     testImplementation("io.quarkus:quarkus-junit")
     testImplementation("io.quarkus:quarkus-junit-mockito")
     testImplementation("io.rest-assured:rest-assured")
