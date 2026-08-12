@@ -2,7 +2,7 @@ import net.ltgt.gradle.errorprone.errorprone
 
 plugins {
     java
-    id("io.quarkus") version "3.38.0" // Inlined for Dependabot version management
+    id("io.quarkus") version "3.38.1" // Inlined for Dependabot version management
     id("com.diffplug.spotless") version "8.9.0"
     id("net.ltgt.errorprone") version "5.1.0"
 }
@@ -34,7 +34,7 @@ configurations.all {
 }
 
 dependencies {
-    implementation(enforcedPlatform("io.quarkus.platform:quarkus-bom:3.38.0")) // Inlined for Dependabot version management
+    implementation(enforcedPlatform("io.quarkus.platform:quarkus-bom:3.38.1")) // Inlined for Dependabot version management
     implementation("io.quarkus:quarkus-rest")
     implementation("io.quarkus:quarkus-rest-jackson")
     implementation("io.quarkus:quarkus-arc")
