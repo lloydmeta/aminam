@@ -4,7 +4,7 @@ plugins {
     java
     id("io.quarkus") version "3.39.0" // Inlined for Dependabot version management
     id("com.diffplug.spotless") version "8.10.0"
-    id("net.ltgt.errorprone") version "5.1.0"
+    id("net.ltgt.errorprone") version "5.1.1"
 }
 
 repositories {
