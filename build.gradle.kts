@@ -49,7 +49,7 @@ dependencies {
     implementation("io.quarkus:quarkus-smallrye-openapi")
     implementation("io.smallrye:smallrye-jwt")
     implementation("com.password4j:password4j:1.8.4")
-    implementation("dev.cel:cel:0.13.1")
+    implementation("dev.cel:cel:0.14.0")
     implementation("org.jspecify:jspecify:1.0.1")
     testImplementation("io.quarkus:quarkus-junit")
     testImplementation("io.quarkus:quarkus-junit-mockito")
