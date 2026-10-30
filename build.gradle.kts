@@ -20,7 +20,7 @@ java {
     }
 }
 
-val errorProneVersion = "2.50.0"
+val errorProneVersion = "2.51.0"
 val errorProneSupportVersion = "0.30.0"
 val nullAwayVersion = "0.14.2"
 
