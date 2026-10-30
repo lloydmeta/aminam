@@ -22,7 +22,7 @@ java {
 
 val errorProneVersion = "2.50.0"
 val errorProneSupportVersion = "0.30.0"
-val nullAwayVersion = "0.14.2"
+val nullAwayVersion = "0.14.3"
 
 configurations.all {
     resolutionStrategy {
